@@ -46,165 +46,92 @@
       box-shadow: var(--glow);
     }
     .title {
-      position:absolute; left:16px; top:14px; padding:12px 14px; pointer-events:auto;
-      display:flex; flex-direction:column; gap:8px; min-width: 250px;
+      position:absolute; left:12px; top:12px; padding:10px 12px; pointer-events:auto;
+      display:flex; flex-direction:column; gap:8px; width:min(calc(100vw - 24px), 720px);
+      background: rgba(8,10,18,.52);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      backdrop-filter: blur(10px);
+      box-shadow: var(--glow);
     }
     .title .main { font-size:14px; letter-spacing:.18em; text-transform:uppercase; }
     .title .sub { font-size:11px; color: var(--muted); }
-    .difficulty-row, .nav-row { display:flex; gap:8px; flex-wrap:wrap; }
+    .topbar {
+      display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .topbar::-webkit-scrollbar { display:none; }
     .chip, .small-btn {
       pointer-events:auto; cursor:pointer; border-radius:999px; border:1px solid var(--line);
-      background: rgba(8,12,20,.9); color: var(--muted); font-size:11px; font-weight:700;
-      letter-spacing:.08em; text-transform:uppercase; padding:9px 12px;
+      background: rgba(8,12,20,.9); color: var(--muted); font-size:10px; font-weight:700;
+      letter-spacing:.08em; text-transform:uppercase; padding:7px 10px; min-height:34px;
+      flex: 0 0 auto;
     }
     .chip.active, .small-btn:hover {
       color: var(--txt); border-color: var(--line-strong);
       box-shadow: 0 0 12px rgba(97,255,242,.18);
     }
-    .meta { font-size:12px; color: var(--muted); line-height: 1.35; }
+    .meta { font-size:12px; color: var(--muted); line-height: 1.32; }
     .meta strong { color: var(--txt); }
     .picker {
-      position:absolute; right:16px; top:50%; transform:translateY(-50%); pointer-events:auto;
-      display:flex; flex-direction:column; gap:12px; padding:14px; border-radius:24px;
-      background: var(--panel); border:1px solid var(--line); box-shadow: var(--glow); backdrop-filter: blur(12px);
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      top: auto;
+      transform: none;
+      pointer-events:auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      padding:10px;
+      border-radius:20px;
+      background: var(--panel);
+      border:1px solid var(--line);
+      box-shadow: var(--glow);
+      backdrop-filter: blur(12px);
     }
     .num-btn {
-      width:56px; height:56px; border-radius:50%; border:1px solid var(--line-strong);
-      background: rgba(7,12,24,.85); color: var(--txt); font-size:22px; font-weight:700;
+      width:48px; height:48px; border-radius:50%; border:1px solid var(--line-strong);
+      background: rgba(7,12,24,.85); color: var(--txt); font-size:20px; font-weight:700;
       cursor:pointer; transition: transform .12s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+      flex: 0 0 auto;
     }
     .num-btn:hover, .num-btn.active {
-      transform: scale(1.06);
+      transform: scale(1.04);
       border-color: rgba(97,255,242,.95);
       box-shadow: 0 0 14px rgba(97,255,242,.28), 0 0 28px rgba(156,123,255,.18);
       background: rgba(18,26,44,.95);
     }
-    .actions { display:flex; flex-direction:column; gap:10px; margin-top:6px; padding-top:8px; border-top:1px solid rgba(120,255,240,.12); }
-    .hint {
-      position:absolute; left:16px; bottom:16px; max-width:min(70vw, 460px); padding:12px 14px;
-      border-radius:18px; color: var(--muted); font-size:12px; line-height:1.45; pointer-events:none;
+    .actions {
+      display:flex; align-items:center; gap:0; margin:0; padding:0; border-top:none;
     }
+    .actions .small-btn {
+      min-height:42px; padding:8px 14px; font-size:10px;
+    }
+    .hint { display:none !important; }
     .status-ok { color: var(--ok); }
     .status-bad { color: var(--bad); }
     @media (max-width: 820px) {
-
-  /* PANEL DE NIVELES (arriba izquierda más compacto) */
-  .title {
-    left: 10px;
-    top: 10px;
-    width: calc(100vw - 20px);
-    max-width: calc(100vw - 20px);
-    padding: 10px 12px;
-    border-radius: 18px;
-  }
-
-  .title .main {
-    font-size: 14px;
-    letter-spacing: .22em;
-  }
-
-  .title .sub {
-    font-size: 10px;
-  }
-
-  .chip, .small-btn {
-    font-size: 11px;
-    padding: 8px 10px;
-  }
-
-  .meta {
-    font-size: 12px;
-  }
-
-
-  /* 🔥 BARRA DE NÚMEROS ABAJO */
-  .picker {
-    position: fixed;
-    bottom: 70px;
-    left: 10px;
-    right: 10px;
-    top: auto;
-    transform: none;
-
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-
-    padding: 12px;
-    border-radius: 20px;
-
-    background: rgba(10, 12, 25, 0.7);
-    backdrop-filter: blur(10px);
-
-    z-index: 30;
-  }
-
-
-  /* BOTONES 1–4 */
-  .num-btn {
-    width: 56px;
-    height: 56px;
-    font-size: 18px;
-    flex-shrink: 0;
-  }
-
-
-  /* BOTONES BORRAR / RESET */
-  .actions {
-    display: flex;
-    flex-direction: row;
-    gap: 8px;
-    margin: 0;
-    padding: 0;
-  }
-
-  .actions .small-btn {
-    flex: 1;
-    font-size: 10px;
-    padding: 10px;
-  }
-
-
-  /* TEXTO INFERIOR */
-  .hint {
-    bottom: 10px;
-    left: 10px;
-    right: 10px;
-    padding: 10px 12px;
-    font-size: 11px;
-  }
-}
-
-    @media (max-width: 430px) {
       .title {
-        width: calc(100vw - 104px);
-        max-width: calc(100vw - 104px);
-        padding: 9px 10px;
+        left: 8px; top: 8px; width: calc(100vw - 16px); padding: 9px 10px; border-radius: 16px;
       }
-      .title .main { font-size: 11px; letter-spacing: .20em; }
-      .title .sub { font-size: 8px; }
+      .title .main { font-size: 13px; }
+      .title .sub { font-size: 9px; }
+      .topbar { gap: 5px; }
       .chip, .small-btn {
-        padding: 7px 9px;
-        font-size: 9px;
+        padding: 6px 9px; min-height: 32px; font-size: 9px;
       }
       .meta { font-size: 10px; }
       .picker {
-        width: 88px;
-        padding: 7px;
+        left: 8px; right: 8px; bottom: 8px; padding: 8px; gap: 6px; border-radius: 18px;
       }
       .num-btn {
-        width: 40px;
-        height: 40px;
-        font-size: 17px;
+        width: 44px; height: 44px; font-size: 17px;
       }
       .actions .small-btn {
-        font-size: 8px;
-        padding: 7px 6px;
-      }
-      .hint {
-        font-size: 10px;
+        min-height: 38px; padding: 7px 12px; font-size: 9px;
       }
     }
   </style>
@@ -220,35 +147,29 @@
 <body>
   <div id="app">
     <div class="hud">
-      <div class="title panel">
-        <div class="main">3Doku</div>
-        <div class="sub">gira · zoom · toca una cara · asigna 1–4</div>
-        <div class="difficulty-row" id="difficultyRow">
-          <button class="chip active" data-difficulty="facil">fácil</button>
-          <button class="chip" data-difficulty="medio">medio</button>
-          <button class="chip" data-difficulty="dificil">difícil</button>
-        </div>
-        <div class="nav-row">
-          <button class="small-btn" id="prevLevel">prev</button>
-          <button class="small-btn" id="nextLevel">next</button>
-          <button class="small-btn" id="reloadLevel">reset nivel</button>
-        </div>
-        <div class="meta" id="levelMeta"></div>
-      </div>
+      
+<div class="title">
+  <div class="main">3Doku</div>
+  <div class="sub">gira · zoom · toca una cara · asigna 1–4</div>
+  <div class="topbar">
+    <button class="chip active" data-difficulty="facil">fácil</button>
+    <button class="chip" data-difficulty="medio">medio</button>
+    <button class="chip" data-difficulty="dificil">difícil</button>
+    <button class="small-btn" id="prevLevel">prev</button>
+    <button class="small-btn" id="nextLevel">next</button>
+    <button class="small-btn" id="reloadLevel">reset</button>
+  </div>
+  <div class="meta" id="levelMeta"></div>
+</div>
 
-      <div class="picker" id="picker">
+<div class="picker" id="picker">
         <button class="num-btn" data-value="1">1</button>
         <button class="num-btn" data-value="2">2</button>
         <button class="num-btn" data-value="3">3</button>
         <button class="num-btn" data-value="4">4</button>
         <div class="actions">
           <button class="small-btn" id="clearFace">borrar</button>
-          <button class="small-btn" id="resetAll">reset todo</button>
         </div>
-      </div>
-
-      <div class="hint panel" id="hintBox">
-        Los discos visibles son las pistas del nivel. Aristas y vértices salen de la misma solución interna.
       </div>
     </div>
   </div>
@@ -259,7 +180,6 @@
 
     const app = document.getElementById('app');
     const levelMeta = document.getElementById('levelMeta');
-    const hintBox = document.getElementById('hintBox');
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -610,7 +530,6 @@
         updateDiscSprite(vertex.sprite, show ? currentLevel.clueValues[vertex.id] : '');
       });
 
-      hintBox.innerHTML = `Discos visibles = pistas del nivel. Puedes girar y hacer zoom. En móvil el zoom deja alejar más el tetraedro y limita el tamaño máximo.`;
       document.querySelectorAll('.chip').forEach(btn => btn.classList.toggle('active', btn.dataset.difficulty === currentDifficulty));
       refreshStatus();
     }
@@ -620,7 +539,6 @@
       assignNumberToSelectedFace();
     }));
     document.getElementById('clearFace').addEventListener('click', clearSelectedFace);
-    document.getElementById('resetAll').addEventListener('click', resetAll);
     document.getElementById('reloadLevel').addEventListener('click', applyLevel);
     document.getElementById('prevLevel').addEventListener('click', () => {
       const levels = levelDefinitions[currentDifficulty];
