@@ -92,7 +92,47 @@
       .num-btn { width:48px; height:48px; font-size:19px; }
       .hint { left:10px; right:80px; bottom:10px; max-width:none; }
     }
-  </style>
+  
+    @media (max-width: 480px) {
+      .ui {
+        width: min(56vw, 320px);
+        padding: 12px 12px 10px;
+      }
+      .title {
+        font-size: 17px;
+        letter-spacing: 0.24em;
+      }
+      .subtitle {
+        font-size: 10px;
+      }
+      .btn {
+        min-height: 38px;
+        padding: 8px 10px;
+        font-size: 11px;
+      }
+      .level-meta {
+        font-size: 11px;
+      }
+      .pad {
+        width: 96px;
+        padding: 10px 8px 10px;
+      }
+      .num {
+        width: 62px;
+        height: 62px;
+        font-size: 18px;
+        margin-bottom: 10px;
+      }
+      .small-btn {
+        min-height: 36px;
+        font-size: 9px;
+      }
+      .hint {
+        font-size: 10px;
+      }
+    }
+
+</style>
   <script type="importmap">
   {
     "imports": {
