@@ -157,13 +157,13 @@
 
     const isMobile = window.innerWidth <= 820;
     const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(0, 0.65, isMobile ? 8.2 : 6.25);
+    camera.position.set(0, 0.65, isMobile ? 10.4 : 6.25);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
-    controls.minDistance = isMobile ? 5.2 : 3.7;
-    controls.maxDistance = isMobile ? 8.6 : 7.6;
+    controls.minDistance = isMobile ? 8.4 : 3.7;
+    controls.maxDistance = isMobile ? 12.6 : 7.6;
     controls.rotateSpeed = 0.9;
     controls.zoomSpeed = 0.9;
     controls.target.set(0, 0.25, 0);
@@ -495,7 +495,7 @@
         updateDiscSprite(vertex.sprite, show ? currentLevel.clueValues[vertex.id] : '');
       });
 
-      hintBox.innerHTML = `Discos visibles = pistas del nivel. Puedes girar y hacer zoom. En móvil ahora el tetraedro admite verse más pequeño.`;
+      hintBox.innerHTML = `Discos visibles = pistas del nivel. Puedes girar y hacer zoom. En móvil el zoom deja alejar más el tetraedro y limita el tamaño máximo.`;
       document.querySelectorAll('.chip').forEach(btn => btn.classList.toggle('active', btn.dataset.difficulty === currentDifficulty));
       refreshStatus();
     }
