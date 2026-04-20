@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Tetra Puzzle Neon</title>
+  <style>
+    :root {
+      --bg: #05060a;
+      --panel: rgba(10, 13, 24, 0.72);
+      --line: rgba(120, 255, 240, 0.22);
+      --line-strong: rgba(120, 255, 240, 0.55);
+      --txt: #e9f8ff;
+      --muted: #89a3b7;
+      --neon-cyan: #61fff2;
+      --neon-pink: #ff4fd8;
+      --neon-lime: #b9ff4d;
+      --neon-violet: #9c7bff;
+      --glow: 0 0 16px rgba(97,255,242,.28), 0 0 34px rgba(156,123,255,.18);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 18%, rgba(156,123,255,.12), transparent 28%),
+        radial-gradient(circle at 80% 22%, rgba(97,255,242,.09), transparent 24%),
+        radial-gradient(circle at 50% 85%, rgba(255,79,216,.07), transparent 28%),
+        var(--bg);
+      color: var(--txt);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      touch-action: none;
+    }
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    canvas { display: block; }
+    .hud {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .title {
+      position: absolute;
+      left: 18px;
+      top: 14px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      background: rgba(8, 10, 18, 0.44);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      box-shadow: var(--glow);
+      pointer-events: none;
+    }
+    .title .main {
+      font-size: 14px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--txt);
+    }
+    .title .sub {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+    .picker {
+      position: absolute;
+      right: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--glow);
+      backdrop-filter: blur(12px);
+      pointer-events: auto;
+    }
+    .num-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 1px solid var(--line-strong);
+      background: rgba(7, 12, 24, 0.85);
+      color: var(--txt);
+      font-size: 22px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .12s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+      box-shadow: 0 0 0 rgba(0,0,0,0);
+    }
+    .num-btn:hover,
+    .num-btn.active {
+      transform: scale(1.06);
+      border-color: rgba(97,255,242,.95);
+      box-shadow: 0 0 14px rgba(97,255,242,.28), 0 0 28px rgba(156,123,255,.18);
+      background: rgba(18, 26, 44, 0.95);
+    }
+    .num-btn:active { transform: scale(0.98); }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 6px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(120,255,240,.12);
+    }
+    .small-btn {
+      min-width: 56px;
+      padding: 10px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(8, 12, 20, 0.9);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .small-btn:hover {
+      color: var(--txt);
+      border-color: var(--line-strong);
+    }
+    .hint {
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      max-width: min(70vw, 420px);
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(8, 10, 18, 0.44);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--glow);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      pointer-events: none;
+    }
+    @media (max-width: 820px) {
+      .picker {
+        right: 12px;
+        gap: 10px;
+        padding: 12px;
+      }
+      .num-btn {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+      }
+      .title {
+        left: 12px;
+        top: 12px;
+      }
+      .hint {
+        left: 12px;
+        bottom: 12px;
+        right: 86px;
+        max-width: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <div class="hud">
+      <div class="title">
+        <div class="main">Tetra Puzzle</div>
+        <div class="sub">gira · zoom · toca una cara · asigna 1–4</div>
+      </div>
+
+      <div class="picker" id="picker">
+        <button class="num-btn" data-value="1">1</button>
+        <button class="num-btn" data-value="2">2</button>
+        <button class="num-btn" data-value="3">3</button>
+        <button class="num-btn" data-value="4">4</button>
+        <div class="actions">
+          <button class="small-btn" id="clearFace">borrar</button>
+          <button class="small-btn" id="resetAll">reset</button>
+        </div>
+      </div>
+
+      <div class="hint">
+        Las caras llevan tus números. Los discos en aristas y vértices muestran pistas fijas. La cara tocada se ilumina.
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const app = document.getElementById('app');
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    app.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x05060a, 10, 24);
+
+    const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0.55, 6.2);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 3.6;
+    controls.maxDistance = 10;
+    controls.rotateSpeed = 0.9;
+    controls.zoomSpeed = 0.9;
+    controls.target.set(0, 0.25, 0);
+    controls.enablePan = false;
+
+    const ambient = new THREE.AmbientLight(0x99aaff, 1.2);
+    scene.add(ambient);
+
+    const dir1 = new THREE.DirectionalLight(0x61fff2, 1.6);
+    dir1.position.set(4, 5, 6);
+    scene.add(dir1);
+
+    const dir2 = new THREE.DirectionalLight(0xff4fd8, 0.95);
+    dir2.position.set(-5, -2, 4);
+    scene.add(dir2);
+
+    const group = new THREE.Group();
+    scene.add(group);
+
+    const tetraRadius = 2.15;
+    const tetraGeo = new THREE.TetrahedronGeometry(tetraRadius, 0);
+    tetraGeo.computeVertexNormals();
+
+    const posAttr = tetraGeo.getAttribute('position');
+    const uniqueVerts = [];
+    for (let i = 0; i < posAttr.count; i++) {
+      const v = new THREE.Vector3().fromBufferAttribute(posAttr, i);
+      if (!uniqueVerts.some(u => u.distanceTo(v) < 1e-5)) uniqueVerts.push(v);
+    }
+
+    const edgePairs = [];
+    for (let i = 0; i < uniqueVerts.length; i++) {
+      for (let j = i + 1; j < uniqueVerts.length; j++) {
+        edgePairs.push([i, j]);
+      }
+    }
+
+    const neon = {
+      cyan: new THREE.Color(0x61fff2),
+      pink: new THREE.Color(0xff4fd8),
+      lime: new THREE.Color(0xb9ff4d),
+      violet: new THREE.Color(0x9c7bff),
+      white: new THREE.Color(0xe9f8ff),
+      deep: new THREE.Color(0x0b1120)
+    };
+
+    const faceValues = [null, null, null, null];
+    let selectedFace = null;
+    let selectedNumber = 1;
+
+    const faceMeshes = [];
+    const faceCenters = [];
+    const faceNormals = [];
+    const faceIndexToVertices = [];
+
+    const triCount = posAttr.count / 3;
+    for (let t = 0; t < triCount; t++) {
+      const a = new THREE.Vector3().fromBufferAttribute(posAttr, t * 3 + 0);
+      const b = new THREE.Vector3().fromBufferAttribute(posAttr, t * 3 + 1);
+      const c = new THREE.Vector3().fromBufferAttribute(posAttr, t * 3 + 2);
+
+      const localGeo = new THREE.BufferGeometry().setFromPoints([a, b, c]);
+      localGeo.setIndex([0, 1, 2]);
+      localGeo.computeVertexNormals();
+
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: 0x9c7bff,
+        emissive: 0x112244,
+        emissiveIntensity: 0.7,
+        transparent: true,
+        opacity: 0.24,
+        roughness: 0.18,
+        metalness: 0.08,
+        transmission: 0.18,
+        thickness: 0.3,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+
+      const mesh = new THREE.Mesh(localGeo, mat);
+      mesh.userData.faceIndex = t;
+      group.add(mesh);
+      faceMeshes.push(mesh);
+
+      const center = a.clone().add(b).add(c).multiplyScalar(1 / 3);
+      faceCenters.push(center);
+
+      const normal = new THREE.Vector3().subVectors(b, a)
+        .cross(new THREE.Vector3().subVectors(c, a))
+        .normalize();
+      if (normal.dot(center) < 0) normal.multiplyScalar(-1);
+      faceNormals.push(normal);
+
+      const ids = [a,b,c].map(v => uniqueVerts.findIndex(u => u.distanceTo(v) < 1e-5));
+      faceIndexToVertices.push(ids);
+    }
+
+    const edges = [];
+    const verticesDisks = [];
+    const edgeDisks = [];
+
+    const edgeNameMap = ['AB','AC','AD','BC','BD','CD'];
+    const vertexNameMap = ['vA','vB','vC','vD'];
+    const edgeValues = { AB: 3, AC: 4, AD: 5, BC: 5, BD: 6, CD: 7 };
+    const vertexValues = { vA: 9, vB: 8, vC: 7, vD: 6 };
+
+    const outerByFace = 0.095;
+    const outerByEdge = 0.11;
+    const faceTextSprites = [];
+
+    function makeDiscSprite(text, color = '#e9f8ff', fontSize = 92, bg = 'rgba(6,12,24,0.62)', border = 'rgba(97,255,242,0.9)', r = 120) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      ctx.clearRect(0,0,256,256);
+      ctx.beginPath();
+      ctx.arc(128,128,r,0,Math.PI*2);
+      ctx.fillStyle = bg;
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = border;
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = border;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.font = `700 ${fontSize}px Inter, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = color;
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = color;
+      ctx.fillText(String(text), 128, 132);
+      ctx.shadowBlur = 0;
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.5, 0.5, 1);
+      return sprite;
+    }
+
+    function makeFaceNumberSprite(text = '') {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.74, 0.74, 1);
+      sprite.userData = { canvas, ctx, tex };
+      updateFaceSprite(sprite, text);
+      return sprite;
+    }
+
+    function updateFaceSprite(sprite, text) {
+      const { canvas, ctx, tex } = sprite.userData;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (text !== '' && text != null) {
+        ctx.font = '700 126px Inter, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#61fff2';
+        ctx.fillText(String(text), 128, 132);
+        ctx.shadowBlur = 0;
+      }
+      tex.needsUpdate = true;
+    }
+
+    const edgeLineMat = new THREE.LineBasicMaterial({
+      color: 0x61fff2,
+      transparent: true,
+      opacity: 0.52
+    });
+
+    edgePairs.forEach(([i, j], idx) => {
+      const a = uniqueVerts[i];
+      const b = uniqueVerts[j];
+      const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+      const line = new THREE.Line(g, edgeLineMat);
+      group.add(line);
+      edges.push(line);
+
+      const mid = a.clone().add(b).multiplyScalar(0.5);
+      const out = mid.clone().normalize().multiplyScalar(outerByEdge);
+      const labelPos = mid.clone().add(out);
+      const edgeSprite = makeDiscSprite(edgeValues[edgeNameMap[idx]], '#e9f8ff', 88, 'rgba(8,14,24,0.66)', 'rgba(255,79,216,0.85)', 104);
+      edgeSprite.position.copy(labelPos);
+      group.add(edgeSprite);
+      edgeDisks.push(edgeSprite);
+    });
+
+    uniqueVerts.forEach((v, i) => {
+      const out = v.clone().normalize().multiplyScalar(outerByFace + 0.12);
+      const labelPos = v.clone().add(out);
+      const sprite = makeDiscSprite(vertexValues[vertexNameMap[i]], '#e9f8ff', 86, 'rgba(8,14,24,0.66)', 'rgba(185,255,77,0.9)', 104);
+      sprite.position.copy(labelPos);
+      group.add(sprite);
+      verticesDisks.push(sprite);
+    });
+
+    faceCenters.forEach((center, i) => {
+      const sprite = makeFaceNumberSprite('');
+      const p = center.clone().add(faceNormals[i].clone().multiplyScalar(0.10));
+      sprite.position.copy(p);
+      group.add(sprite);
+      faceTextSprites.push(sprite);
+    });
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    function setSelectedFace(idx) {
+      selectedFace = idx;
+      faceMeshes.forEach((mesh, i) => {
+        const selected = i === idx;
+        mesh.material.color.set(selected ? 0x61fff2 : 0x9c7bff);
+        mesh.material.emissive.set(selected ? 0x144b66 : 0x112244);
+        mesh.material.opacity = selected ? 0.42 : 0.24;
+        mesh.material.emissiveIntensity = selected ? 1.6 : 0.7;
+      });
+    }
+
+    function setSelectedNumber(n) {
+      selectedNumber = n;
+      document.querySelectorAll('.num-btn').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.dataset.value) === n);
+      });
+    }
+
+    setSelectedNumber(1);
+
+    function assignNumberToSelectedFace() {
+      if (selectedFace == null) return;
+      faceValues[selectedFace] = selectedNumber;
+      updateFaceSprite(faceTextSprites[selectedFace], selectedNumber);
+    }
+
+    function clearSelectedFace() {
+      if (selectedFace == null) return;
+      faceValues[selectedFace] = null;
+      updateFaceSprite(faceTextSprites[selectedFace], '');
+    }
+
+    function resetAll() {
+      for (let i = 0; i < 4; i++) {
+        faceValues[i] = null;
+        updateFaceSprite(faceTextSprites[i], '');
+      }
+      setSelectedFace(null);
+    }
+
+    document.querySelectorAll('.num-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setSelectedNumber(Number(btn.dataset.value));
+        assignNumberToSelectedFace();
+      });
+    });
+
+    document.getElementById('clearFace').addEventListener('click', clearSelectedFace);
+    document.getElementById('resetAll').addEventListener('click', resetAll);
+
+    function updatePointer(event) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const clientX = event.clientX ?? (event.touches && event.touches[0]?.clientX) ?? 0;
+      const clientY = event.clientY ?? (event.touches && event.touches[0]?.clientY) ?? 0;
+      pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    }
+
+    let downX = 0;
+    let downY = 0;
+    let moved = false;
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      downX = e.clientX;
+      downY = e.clientY;
+      moved = false;
+    });
+
+    renderer.domElement.addEventListener('pointermove', (e) => {
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 8) moved = true;
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+      if (moved) return;
+      updatePointer(e);
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(faceMeshes, false);
+      if (hits.length) {
+        setSelectedFace(hits[0].object.userData.faceIndex);
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (/^[1-4]$/.test(e.key)) {
+        setSelectedNumber(Number(e.key));
+        assignNumberToSelectedFace();
+      }
+      if (e.key === 'Backspace' || e.key === 'Delete') clearSelectedFace();
+      if (e.key.toLowerCase() === 'r') resetAll();
+    });
+
+    function resize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', resize);
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+
+      edges.forEach((line, i) => {
+        line.material.opacity = 0.38 + 0.14 * Math.sin(t * 1.2 + i);
+      });
+      edgeDisks.forEach((s, i) => {
+        s.material.rotation = Math.sin(t * 0.3 + i) * 0.03;
+      });
+      verticesDisks.forEach((s, i) => {
+        s.material.rotation = Math.cos(t * 0.34 + i) * 0.03;
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
