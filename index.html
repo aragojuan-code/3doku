@@ -100,10 +100,23 @@
     }
     .number-grid::-webkit-scrollbar { display:none; }
     .num-btn {
+      position: relative;
       width:48px; height:48px; border-radius:50%; border:1px solid var(--line-strong);
       background: #070c18; color: var(--txt); font-size:20px; font-weight:700;
       cursor:pointer; transition: transform .12s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
       flex: 0 0 auto;
+    }
+    .num-btn.used::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: -7px;
+      width: 22px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--lime);
+      box-shadow: 0 0 8px rgba(185,255,77,.9);
     }
     .num-btn:hover, .num-btn.active {
       transform: scale(1.04);
@@ -570,14 +583,23 @@
         const selected = i === idx;
         mesh.material.color.set(selected ? 0x61fff2 : 0x9c7bff);
         mesh.material.emissive.set(selected ? 0x144b66 : 0x112244);
-        mesh.material.opacity = selected ? 0.42 : 0.24;
-        mesh.material.emissiveIntensity = selected ? 1.6 : 0.7;
+        mesh.material.opacity = selected ? 1 : 0.24;
+        mesh.material.transmission = selected ? 0 : 0.18;
+        mesh.material.emissiveIntensity = selected ? 1.9 : 0.7;
       });
     }
 
     function setSelectedNumber(n) {
       selectedNumber = n;
       document.querySelectorAll('.num-btn').forEach(btn => btn.classList.toggle('active', Number(btn.dataset.value) === n));
+    }
+
+    function refreshNumberUsageIndicators() {
+      const usedNumbers = new Set(faceValues.filter(v => v != null));
+      document.querySelectorAll('.num-btn').forEach((btn) => {
+        const value = Number(btn.dataset.value);
+        btn.classList.toggle('used', usedNumbers.has(value));
+      });
     }
 
     function getMaxNumberForShape(shapeKey) {
@@ -600,6 +622,7 @@
       }
       if (selectedNumber > max) selectedNumber = 1;
       setSelectedNumber(selectedNumber);
+      refreshNumberUsageIndicators();
       rangeHint.textContent = `gira · zoom · toca una cara · asigna 1–${max}`;
     }
 
@@ -607,6 +630,7 @@
       if (selectedFace == null) return;
       faceValues[selectedFace] = selectedNumber;
       updateFaceSprite(puzzle.faceTextSprites[selectedFace], selectedNumber, false);
+      refreshNumberUsageIndicators();
       refreshStatus();
     }
 
@@ -614,6 +638,7 @@
       if (selectedFace == null) return;
       faceValues[selectedFace] = null;
       updateFaceSprite(puzzle.faceTextSprites[selectedFace], '');
+      refreshNumberUsageIndicators();
       refreshStatus();
     }
 
@@ -621,6 +646,7 @@
       faceValues = puzzle.faceMeshes.map(() => null);
       puzzle.faceTextSprites.forEach((sprite) => updateFaceSprite(sprite, ''));
       setSelectedFace(null);
+      refreshNumberUsageIndicators();
       refreshStatus();
     }
 
