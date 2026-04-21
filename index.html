@@ -295,18 +295,23 @@
       }
     };
 
+    function orientLabelToNormal(object, normal) {
+      const safeNormal = normal.clone().normalize();
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), safeNormal);
+      object.quaternion.copy(q);
+    }
+
     function makeDiscSprite(text, color = '#e9f8ff', fontSize = 92, bg = 'rgba(6,12,24,0.62)', border = 'rgba(97,255,242,0.9)', r = 120) {
       const canvas = document.createElement('canvas');
       canvas.width = 256; canvas.height = 256;
       const ctx = canvas.getContext('2d');
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
-      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
-      const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(0.5, 0.5, 1);
-      sprite.userData = { canvas, ctx, tex, color, fontSize, bg, border, r };
-      updateDiscSprite(sprite, text);
-      return sprite;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), mat);
+      plane.userData = { canvas, ctx, tex, color, fontSize, bg, border, r };
+      updateDiscSprite(plane, text);
+      return plane;
     }
 
     function updateDiscSprite(sprite, text) {
@@ -332,12 +337,11 @@
       const ctx = canvas.getContext('2d');
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
-      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
-      const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(0.66, 0.66, 1);
-      sprite.userData = { canvas, ctx, tex };
-      updateFaceSprite(sprite, '');
-      return sprite;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.66), mat);
+      plane.userData = { canvas, ctx, tex };
+      updateFaceSprite(plane, '');
+      return plane;
     }
 
     function updateFaceSprite(sprite, text, solved = false) {
@@ -459,6 +463,7 @@
         const labelPos = edge.midpoint.clone().add(edge.midpoint.clone().normalize().multiplyScalar(outerByEdge));
         const sprite = makeDiscSprite('', '#e9f8ff', shapeKey === 'icosa' ? 68 : 88, 'rgba(8,14,24,0.66)', 'rgba(255,79,216,0.85)', shapeKey === 'icosa' ? 92 : 104);
         sprite.position.copy(labelPos);
+        orientLabelToNormal(sprite, labelPos.clone().normalize());
         sprite.visible = false;
         group.add(sprite);
         edgeSprites.push(sprite);
@@ -470,6 +475,7 @@
         const labelPos = vertex.position.clone().add(vertex.position.clone().normalize().multiplyScalar(outerByFace + (shapeKey === 'icosa' ? 0.08 : 0.12)));
         const sprite = makeDiscSprite('', '#e9f8ff', shapeKey === 'icosa' ? 68 : 86, 'rgba(8,14,24,0.66)', 'rgba(185,255,77,0.9)', shapeKey === 'icosa' ? 92 : 104);
         sprite.position.copy(labelPos);
+        orientLabelToNormal(sprite, labelPos.clone().normalize());
         sprite.visible = false;
         group.add(sprite);
         vertexSprites.push(sprite);
@@ -479,6 +485,7 @@
       faceCenters.forEach((center, i) => {
         const sprite = makeFaceNumberSprite();
         sprite.position.copy(center.clone().add(faceNormals[i].clone().multiplyScalar(shapeKey === 'icosa' ? 0.09 : 0.10)));
+        orientLabelToNormal(sprite, faceNormals[i]);
         group.add(sprite);
         faceTextSprites.push(sprite);
       });
@@ -691,8 +698,6 @@
       requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
       puzzle?.edgeLines.forEach((line, i) => { line.material.opacity = 0.38 + 0.14 * Math.sin(t * 1.2 + i); });
-      puzzle?.edgeSprites.forEach((s, i) => { s.material.rotation = Math.sin(t * 0.3 + i) * 0.03; });
-      puzzle?.vertexSprites.forEach((s, i) => { s.material.rotation = Math.cos(t * 0.34 + i) * 0.03; });
       controls.update();
       renderer.render(scene, camera);
     }
