@@ -175,6 +175,7 @@
   <div class="topbar">
     <button class="chip shape-chip active" data-shape="tetra">tetraedro</button>
     <button class="chip shape-chip" data-shape="icosa">icosaedro</button>
+    <button class="chip shape-chip" data-shape="icosa5">icosaedro 1–5</button>
     <button class="chip active" data-difficulty="facil">fácil</button>
     <button class="chip" data-difficulty="medio">medio</button>
     <button class="chip" data-difficulty="dificil">difícil</button>
@@ -248,6 +249,8 @@
     let currentDifficulty = 'facil';
     let currentLevelIndex = 0;
     let currentLevel = null;
+    let fixedFaces = new Set();
+    let conflictedFaces = new Set();
 
     const edgeLineMat = new THREE.LineBasicMaterial({ color: 0x61fff2, transparent: true, opacity: 0.52 });
 
@@ -311,6 +314,14 @@
               name: 'Icosa Difícil 2'
             }
           ]
+        }
+      },
+      icosa5: {
+        geometryFactory: () => new THREE.IcosahedronGeometry(2.05, 0),
+        levels: {
+          facil: [],
+          medio: [],
+          dificil: []
         }
       }
     };
@@ -380,18 +391,24 @@
       return plane;
     }
 
-    function updateFaceSprite(sprite, text, solved = false) {
+    function updateFaceSprite(sprite, text, solved = false, given = false, conflict = false) {
       const { canvas, ctx, tex } = sprite.userData;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (text !== '' && text != null) {
         ctx.font = '700 154px Inter, Arial, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = solved ? '#73ffb1' : '#ffffff';
-        ctx.shadowBlur = 20; ctx.shadowColor = solved ? '#73ffb1' : '#61fff2';
+        const fill = conflict ? '#ff7aaa' : (given ? '#b9ff4d' : (solved ? '#73ffb1' : '#ffffff'));
+        const glow = conflict ? '#ff4fd8' : (given ? '#b9ff4d' : (solved ? '#73ffb1' : '#61fff2'));
+        ctx.fillStyle = fill;
+        ctx.shadowBlur = 20; ctx.shadowColor = glow;
         ctx.fillText(String(text), 128, 132);
         ctx.shadowBlur = 0;
       }
       tex.needsUpdate = true;
+    }
+
+    function isIcosa5() {
+      return activeShape === 'icosa5';
     }
 
     function createPuzzle(shapeKey) {
@@ -484,8 +501,9 @@
       const vertexSprites = [];
       const faceTextSprites = [];
 
-      const outerByFace = shapeKey === 'icosa' ? 0.11 : 0.095;
-      const outerByEdge = shapeKey === 'icosa' ? 0.13 : 0.11;
+      const isIcosaGeometry = shapeKey === 'icosa' || shapeKey === 'icosa5';
+      const outerByFace = isIcosaGeometry ? 0.11 : 0.095;
+      const outerByEdge = isIcosaGeometry ? 0.13 : 0.11;
 
       allEdges.forEach((edge) => {
         const [i, j] = edge.vertexPair;
@@ -497,7 +515,7 @@
         edgeLines.push(line);
 
         const labelPos = edge.midpoint.clone().add(edge.midpoint.clone().normalize().multiplyScalar(outerByEdge));
-        const sprite = makeDiscSprite('', '#e9f8ff', shapeKey === 'icosa' ? 68 : 88, 'rgba(8,14,24,0.66)', 'rgba(255,79,216,0.85)', shapeKey === 'icosa' ? 92 : 104);
+        const sprite = makeDiscSprite('', '#e9f8ff', isIcosaGeometry ? 68 : 88, 'rgba(8,14,24,0.66)', 'rgba(255,79,216,0.85)', isIcosaGeometry ? 92 : 104);
         sprite.position.copy(labelPos);
         orientLabelToNormal(sprite, labelPos.clone().normalize());
         sprite.visible = false;
@@ -508,8 +526,8 @@
       });
 
       allVertices.forEach((vertex) => {
-        const labelPos = vertex.position.clone().add(vertex.position.clone().normalize().multiplyScalar(outerByFace + (shapeKey === 'icosa' ? 0.08 : 0.12)));
-        const sprite = makeDiscSprite('', '#e9f8ff', shapeKey === 'icosa' ? 68 : 86, 'rgba(8,14,24,0.66)', 'rgba(185,255,77,0.9)', shapeKey === 'icosa' ? 92 : 104);
+        const labelPos = vertex.position.clone().add(vertex.position.clone().normalize().multiplyScalar(outerByFace + (isIcosaGeometry ? 0.08 : 0.12)));
+        const sprite = makeDiscSprite('', '#e9f8ff', isIcosaGeometry ? 68 : 86, 'rgba(8,14,24,0.66)', 'rgba(185,255,77,0.9)', isIcosaGeometry ? 92 : 104);
         sprite.position.copy(labelPos);
         orientLabelToNormal(sprite, labelPos.clone().normalize());
         sprite.visible = false;
@@ -520,7 +538,7 @@
 
       faceCenters.forEach((center, i) => {
         const sprite = makeFaceNumberSprite();
-        sprite.position.copy(center.clone().add(faceNormals[i].clone().multiplyScalar(shapeKey === 'icosa' ? 0.09 : 0.10)));
+        sprite.position.copy(center.clone().add(faceNormals[i].clone().multiplyScalar(isIcosaGeometry ? 0.09 : 0.10)));
         orientLabelToNormal(sprite, faceNormals[i]);
         group.add(sprite);
         faceTextSprites.push(sprite);
@@ -564,6 +582,10 @@
     }
 
     function prepareLevels(shapeKey) {
+      if (shapeKey === 'icosa5') {
+        prepareIcosa5Levels();
+        return;
+      }
       const defs = puzzleDefinitions[shapeKey].levels;
       Object.values(defs).forEach((levels) => {
         levels.forEach((level) => {
@@ -577,12 +599,138 @@
       });
     }
 
+    function validateIcosa5State(values, vertexBlocks) {
+      const allowed = new Set([1, 2, 3, 4, 5]);
+      let hasConflict = false;
+      const conflictFaces = new Set();
+      const isComplete = values.every(v => v != null);
+
+      values.forEach((v, faceIndex) => {
+        if (v != null && !allowed.has(v)) {
+          hasConflict = true;
+          conflictFaces.add(faceIndex);
+        }
+      });
+
+      vertexBlocks.forEach((vertex) => {
+        const seen = new Map();
+        const filled = [];
+        vertex.faces.forEach((faceIndex) => {
+          const value = values[faceIndex];
+          if (value == null) return;
+          filled.push({ faceIndex, value });
+          if (!seen.has(value)) {
+            seen.set(value, [faceIndex]);
+          } else {
+            seen.get(value).push(faceIndex);
+          }
+        });
+        for (const [value, faces] of seen.entries()) {
+          if (!allowed.has(value) || faces.length > 1) {
+            hasConflict = true;
+            faces.forEach(faceIndex => conflictFaces.add(faceIndex));
+          }
+        }
+        if (filled.length === 5) {
+          const sorted = [...seen.keys()].sort((a, b) => a - b);
+          if (sorted.length !== 5 || sorted.some((v, i) => v !== i + 1)) {
+            hasConflict = true;
+            filled.forEach(entry => conflictFaces.add(entry.faceIndex));
+          }
+        }
+      });
+
+      const isSolved = isComplete && !hasConflict && vertexBlocks.every((vertex) => {
+        const sorted = vertex.faces.map(faceIndex => values[faceIndex]).sort((a, b) => a - b);
+        return sorted.length === 5 && sorted.every((v, i) => v === i + 1);
+      });
+
+      return { hasConflict, isComplete, isSolved, conflictFaces };
+    }
+
+    function createIcosa5BaseSolution() {
+      const faceCount = puzzle.faceMeshes.length;
+      const values = new Array(faceCount).fill(null);
+      const faceToVertices = Array.from({ length: faceCount }, () => []);
+      puzzle.allVertices.forEach((vertex, vertexIndex) => {
+        vertex.faces.forEach((faceIndex) => faceToVertices[faceIndex].push(vertexIndex));
+      });
+      const order = [...Array(faceCount).keys()].sort((a, b) => faceToVertices[b].length - faceToVertices[a].length);
+
+      function canPlace(faceIndex, value) {
+        for (const vertexIndex of faceToVertices[faceIndex]) {
+          const vertex = puzzle.allVertices[vertexIndex];
+          let occurrences = 1;
+          vertex.faces.forEach((idx) => {
+            if (idx !== faceIndex && values[idx] === value) {
+              occurrences++;
+            }
+          });
+          if (occurrences > 1) return false;
+        }
+        return true;
+      }
+
+      function solve(step = 0) {
+        if (step >= order.length) return true;
+        const faceIndex = order[step];
+        for (let value = 1; value <= 5; value++) {
+          if (!canPlace(faceIndex, value)) continue;
+          values[faceIndex] = value;
+          if (solve(step + 1)) return true;
+          values[faceIndex] = null;
+        }
+        return false;
+      }
+
+      if (!solve()) throw new Error('No se pudo generar solución válida para icosa5');
+      return values;
+    }
+
+    function buildIcosa5Level(name, solution, givensArray) {
+      const givens = {};
+      givensArray.forEach((faceIndex) => { givens[faceIndex] = solution[faceIndex]; });
+      return { name, solution: [...solution], givens };
+    }
+
+    function prepareIcosa5Levels() {
+      const levels = puzzleDefinitions.icosa5.levels;
+      if (levels.facil.length && levels.medio.length && levels.dificil.length) return;
+      const base = createIcosa5BaseSolution();
+      const permuted = (shift) => base.map(v => ((v + shift - 1) % 5) + 1);
+      const solutions = [base, permuted(1), permuted(2), permuted(3), permuted(4)];
+
+      levels.facil = [
+        buildIcosa5Level('Icosa 1–5 Fácil 1', solutions[0], [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]),
+        buildIcosa5Level('Icosa 1–5 Fácil 2', solutions[1], [1, 3, 5, 7, 9, 11, 13, 15, 17, 19]),
+        buildIcosa5Level('Icosa 1–5 Fácil 3', solutions[2], [0, 1, 4, 5, 8, 9, 12, 13, 16, 17]),
+        buildIcosa5Level('Icosa 1–5 Fácil 4', solutions[3], [2, 3, 6, 7, 10, 11, 14, 15, 18, 19]),
+        buildIcosa5Level('Icosa 1–5 Fácil 5', solutions[4], [0, 3, 4, 7, 8, 11, 12, 15, 16, 19])
+      ];
+      levels.medio = [
+        buildIcosa5Level('Icosa 1–5 Medio 1', solutions[0], [0, 4, 5, 9, 10, 14, 15, 19]),
+        buildIcosa5Level('Icosa 1–5 Medio 2', solutions[1], [1, 2, 6, 7, 11, 12, 16, 17]),
+        buildIcosa5Level('Icosa 1–5 Medio 3', solutions[2], [0, 2, 5, 7, 10, 12, 15, 17]),
+        buildIcosa5Level('Icosa 1–5 Medio 4', solutions[3], [1, 3, 4, 8, 9, 13, 14, 18]),
+        buildIcosa5Level('Icosa 1–5 Medio 5', solutions[4], [2, 4, 6, 8, 11, 13, 16, 18])
+      ];
+      levels.dificil = [
+        buildIcosa5Level('Icosa 1–5 Difícil 1', solutions[0], [0, 6, 11, 17, 19]),
+        buildIcosa5Level('Icosa 1–5 Difícil 2', solutions[1], [1, 5, 9, 14, 18]),
+        buildIcosa5Level('Icosa 1–5 Difícil 3', solutions[2], [2, 7, 10, 15, 16]),
+        buildIcosa5Level('Icosa 1–5 Difícil 4', solutions[3], [3, 4, 8, 12, 19]),
+        buildIcosa5Level('Icosa 1–5 Difícil 5', solutions[4], [0, 5, 10, 13, 18])
+      ];
+    }
+
     function setSelectedFace(idx) {
       selectedFace = idx;
       puzzle.faceMeshes.forEach((mesh, i) => {
         const selected = i === idx;
-        mesh.material.color.set(selected ? 0x61fff2 : 0x9c7bff);
-        mesh.material.emissive.set(selected ? 0x144b66 : 0x112244);
+        const isGiven = fixedFaces.has(i);
+        const isConflict = conflictedFaces.has(i);
+        mesh.material.color.set(selected ? 0x61fff2 : (isGiven ? 0xb9ff4d : (isConflict ? 0xff4fd8 : 0x9c7bff)));
+        mesh.material.emissive.set(selected ? 0x144b66 : (isConflict ? 0x5e1234 : (isGiven ? 0x2d4f1b : 0x112244)));
         mesh.material.opacity = 1;
         mesh.material.transmission = 0;
         mesh.material.emissiveIntensity = selected ? 1.9 : 0.7;
@@ -595,6 +743,10 @@
     }
 
     function refreshNumberUsageIndicators() {
+      if (isIcosa5()) {
+        document.querySelectorAll('.num-btn').forEach((btn) => btn.classList.remove('used'));
+        return;
+      }
       const usedNumbers = new Set(faceValues.filter(v => v != null));
       document.querySelectorAll('.num-btn').forEach((btn) => {
         const value = Number(btn.dataset.value);
@@ -603,7 +755,9 @@
     }
 
     function getMaxNumberForShape(shapeKey) {
-      return shapeKey === 'icosa' ? 20 : 4;
+      if (shapeKey === 'icosa') return 20;
+      if (shapeKey === 'icosa5') return 5;
+      return 4;
     }
 
     function renderNumberPicker(shapeKey) {
@@ -628,14 +782,16 @@
 
     function assignNumberToSelectedFace() {
       if (selectedFace == null) return;
+      if (isIcosa5() && fixedFaces.has(selectedFace)) return;
       faceValues[selectedFace] = selectedNumber;
-      updateFaceSprite(puzzle.faceTextSprites[selectedFace], selectedNumber, false);
+      updateFaceSprite(puzzle.faceTextSprites[selectedFace], selectedNumber, false, false, conflictedFaces.has(selectedFace));
       refreshNumberUsageIndicators();
       refreshStatus();
     }
 
     function clearSelectedFace() {
       if (selectedFace == null) return;
+      if (isIcosa5() && fixedFaces.has(selectedFace)) return;
       faceValues[selectedFace] = null;
       updateFaceSprite(puzzle.faceTextSprites[selectedFace], '');
       refreshNumberUsageIndicators();
@@ -644,6 +800,8 @@
 
     function resetAll() {
       faceValues = puzzle.faceMeshes.map(() => null);
+      fixedFaces = new Set();
+      conflictedFaces = new Set();
       puzzle.faceTextSprites.forEach((sprite) => updateFaceSprite(sprite, ''));
       setSelectedFace(null);
       refreshNumberUsageIndicators();
@@ -653,6 +811,31 @@
     function arraysEqual(a, b) { return a.length === b.length && a.every((v, i) => v === b[i]); }
 
     function refreshStatus() {
+      if (isIcosa5()) {
+        const validation = validateIcosa5State(faceValues, puzzle.allVertices);
+        conflictedFaces = validation.conflictFaces;
+        let status = `completa las ${puzzle.faceMeshes.length} caras`;
+        let cls = '';
+        if (validation.hasConflict) {
+          status = 'hay conflicto en vértices';
+          cls = 'status-bad';
+        } else if (validation.isSolved) {
+          status = 'resuelto';
+          cls = 'status-ok';
+        }
+        faceValues.forEach((value, i) => {
+          updateFaceSprite(
+            puzzle.faceTextSprites[i],
+            value == null ? '' : value,
+            validation.isSolved,
+            fixedFaces.has(i),
+            conflictedFaces.has(i)
+          );
+        });
+        setSelectedFace(selectedFace);
+        levelMeta.innerHTML = `<strong>${currentLevel.name}</strong> · ${currentDifficulty} · ${activeShape} · bloques-vértice: ${puzzle.allVertices.length}<br><span class="${cls}">${status}</span>`;
+        return;
+      }
       const filled = faceValues.every(v => v != null);
       const assigned = faceValues.filter(v => v != null);
       const hasDuplicates = new Set(assigned).size !== assigned.length;
@@ -679,22 +862,44 @@
     function applyLevel() {
       const levels = puzzleDefinitions[activeShape].levels[currentDifficulty];
       currentLevel = levels[currentLevelIndex];
-      currentLevel.clueValues = computeClueValues(currentLevel.solution);
       resetAll();
 
-      puzzle.allEdges.forEach(edge => {
-        const show = currentLevel.clues.includes(edge.id);
-        edge.sprite.visible = show;
-        updateDiscSprite(edge.sprite, show ? currentLevel.clueValues[edge.id] : '');
-      });
-      puzzle.allVertices.forEach(vertex => {
-        const show = currentLevel.clues.includes(vertex.id);
-        vertex.sprite.visible = show;
-        updateDiscSprite(vertex.sprite, show ? currentLevel.clueValues[vertex.id] : '');
-      });
+      if (isIcosa5()) {
+        puzzle.allEdges.forEach((edge) => {
+          edge.sprite.visible = false;
+          updateDiscSprite(edge.sprite, '');
+        });
+        puzzle.allVertices.forEach((vertex) => {
+          vertex.sprite.visible = false;
+          updateDiscSprite(vertex.sprite, '');
+        });
+        fixedFaces = new Set(Object.keys(currentLevel.givens).map(Number));
+        faceValues = puzzle.faceMeshes.map((_, faceIndex) => (
+          Object.prototype.hasOwnProperty.call(currentLevel.givens, faceIndex) ? currentLevel.givens[faceIndex] : null
+        ));
+        faceValues.forEach((value, i) => {
+          updateFaceSprite(puzzle.faceTextSprites[i], value == null ? '' : value, false, fixedFaces.has(i), false);
+        });
+      } else {
+        currentLevel.clueValues = computeClueValues(currentLevel.solution);
+        puzzle.allEdges.forEach(edge => {
+          const show = currentLevel.clues.includes(edge.id);
+          edge.sprite.visible = show;
+          updateDiscSprite(edge.sprite, show ? currentLevel.clueValues[edge.id] : '');
+        });
+        puzzle.allVertices.forEach(vertex => {
+          const show = currentLevel.clues.includes(vertex.id);
+          vertex.sprite.visible = show;
+          updateDiscSprite(vertex.sprite, show ? currentLevel.clueValues[vertex.id] : '');
+        });
+      }
+
+      conflictedFaces = new Set();
 
       document.querySelectorAll('.chip[data-difficulty]').forEach(btn => btn.classList.toggle('active', btn.dataset.difficulty === currentDifficulty));
       document.querySelectorAll('.shape-chip').forEach(btn => btn.classList.toggle('active', btn.dataset.shape === activeShape));
+      setSelectedFace(null);
+      refreshNumberUsageIndicators();
       refreshStatus();
     }
 
@@ -748,7 +953,10 @@
       updatePointer(e);
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObjects(puzzle.faceMeshes, false);
-      if (hits.length) setSelectedFace(hits[0].object.userData.faceIndex);
+      if (hits.length) {
+        const faceIndex = hits[0].object.userData.faceIndex;
+        setSelectedFace(faceIndex);
+      }
     });
 
     window.addEventListener('keydown', (e) => {
