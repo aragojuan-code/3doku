@@ -227,6 +227,16 @@
     controls.target.set(0, 0.25, 0);
     controls.enablePan = false;
 
+    function setInitialView() {
+      const currentDir = camera.position.clone().sub(controls.target);
+      if (currentDir.lengthSq() === 0) {
+        currentDir.set(0, 0.4, 1);
+      }
+      currentDir.normalize().multiplyScalar(controls.maxDistance);
+      camera.position.copy(controls.target).add(currentDir);
+      controls.update();
+    }
+
     scene.add(new THREE.AmbientLight(0x99aaff, 1.2));
     const dir1 = new THREE.DirectionalLight(0x61fff2, 1.6); dir1.position.set(4, 5, 6); scene.add(dir1);
     const dir2 = new THREE.DirectionalLight(0xff4fd8, 0.95); dir2.position.set(-5, -2, 4); scene.add(dir2);
@@ -911,6 +921,7 @@
       prepareLevels(shapeKey);
       currentLevelIndex = 0;
       setSelectedFace(null);
+      setInitialView();
       applyLevel();
     }
     document.getElementById('clearFace').addEventListener('click', clearSelectedFace);
