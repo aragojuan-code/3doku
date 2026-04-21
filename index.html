@@ -7,7 +7,7 @@
   <style>
     :root {
       --bg: #05060a;
-      --panel: rgba(10, 13, 24, 0.72);
+      --panel: #0a0d18;
       --line: rgba(120, 255, 240, 0.18);
       --line-strong: rgba(120, 255, 240, 0.56);
       --txt: #eefaff;
@@ -39,19 +39,17 @@
     canvas { display:block; }
     .hud { position:absolute; inset:0; pointer-events:none; }
     .panel {
-      background: rgba(8,10,18,.46);
+      background: #080a12;
       border: 1px solid var(--line);
       border-radius: 18px;
-      backdrop-filter: blur(10px);
       box-shadow: var(--glow);
     }
     .title {
       position:absolute; left:12px; top:12px; padding:10px 12px; pointer-events:auto;
       display:flex; flex-direction:column; gap:8px; width:min(calc(100vw - 24px), 720px);
-      background: rgba(8,10,18,.52);
+      background: #080a12;
       border: 1px solid var(--line);
       border-radius: 18px;
-      backdrop-filter: blur(10px);
       box-shadow: var(--glow);
     }
     .title .main { font-size:14px; letter-spacing:.18em; text-transform:uppercase; }
@@ -90,7 +88,6 @@
       background: var(--panel);
       border:1px solid var(--line);
       box-shadow: var(--glow);
-      backdrop-filter: blur(12px);
     }
     .number-grid {
       display:flex;
@@ -104,7 +101,7 @@
     .number-grid::-webkit-scrollbar { display:none; }
     .num-btn {
       width:48px; height:48px; border-radius:50%; border:1px solid var(--line-strong);
-      background: rgba(7,12,24,.85); color: var(--txt); font-size:20px; font-weight:700;
+      background: #070c18; color: var(--txt); font-size:20px; font-weight:700;
       cursor:pointer; transition: transform .12s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
       flex: 0 0 auto;
     }
@@ -112,7 +109,7 @@
       transform: scale(1.04);
       border-color: rgba(97,255,242,.95);
       box-shadow: 0 0 14px rgba(97,255,242,.28), 0 0 28px rgba(156,123,255,.18);
-      background: rgba(18,26,44,.95);
+      background: #121a2c;
     }
     .actions {
       display:flex; align-items:center; gap:0; margin:0; padding:0; border-top:none;
