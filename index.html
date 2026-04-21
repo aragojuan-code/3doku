@@ -315,22 +315,21 @@
     const outerByFace = 0.095;
     const outerByEdge = 0.11;
 
-    function makeDiscSprite(text, color = '#e9f8ff', fontSize = 92, bg = 'rgba(6,12,24,0.62)', border = 'rgba(97,255,242,0.9)', r = 120) {
+    function makeDiscLabel(text, color = '#e9f8ff', fontSize = 92, bg = 'rgba(6,12,24,0.62)', border = 'rgba(97,255,242,0.9)', r = 120) {
       const canvas = document.createElement('canvas');
       canvas.width = 256; canvas.height = 256;
       const ctx = canvas.getContext('2d');
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
-      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
-      const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(0.5, 0.5, 1);
-      sprite.userData = { canvas, ctx, tex, color, fontSize, bg, border, r };
-      updateDiscSprite(sprite, text);
-      return sprite;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), mat);
+      mesh.userData = { canvas, ctx, tex, color, fontSize, bg, border, r };
+      updateDiscLabel(mesh, text);
+      return mesh;
     }
 
-    function updateDiscSprite(sprite, text) {
-      const { canvas, ctx, tex, color, fontSize, bg, border, r } = sprite.userData;
+    function updateDiscLabel(label, text) {
+      const { canvas, ctx, tex, color, fontSize, bg, border, r } = label.userData;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (text == null || text === '') { tex.needsUpdate = true; return; }
       ctx.beginPath();
@@ -346,22 +345,21 @@
       tex.needsUpdate = true;
     }
 
-    function makeFaceNumberSprite() {
+    function makeFaceNumberLabel() {
       const canvas = document.createElement('canvas');
       canvas.width = 256; canvas.height = 256;
       const ctx = canvas.getContext('2d');
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
-      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
-      const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(0.74, 0.74, 1);
-      sprite.userData = { canvas, ctx, tex };
-      updateFaceSprite(sprite, '');
-      return sprite;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      const label = new THREE.Mesh(new THREE.PlaneGeometry(0.74, 0.74), mat);
+      label.userData = { canvas, ctx, tex };
+      updateFaceLabel(label, '');
+      return label;
     }
 
-    function updateFaceSprite(sprite, text, solved = false) {
-      const { canvas, ctx, tex } = sprite.userData;
+    function updateFaceLabel(label, text, solved = false) {
+      const { canvas, ctx, tex } = label.userData;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (text !== '' && text != null) {
         ctx.font = '700 126px Inter, Arial, sans-serif';
@@ -386,30 +384,34 @@
       edgeLines.push(line);
 
       const labelPos = edge.midpoint.clone().add(edge.midpoint.clone().normalize().multiplyScalar(outerByEdge));
-      const sprite = makeDiscSprite('', '#e9f8ff', 88, 'rgba(8,14,24,0.66)', 'rgba(255,79,216,0.85)', 104);
-      sprite.position.copy(labelPos);
-      sprite.visible = false;
-      group.add(sprite);
-      edgeSprites.push(sprite);
-      edge.sprite = sprite;
+      const label = makeDiscLabel('', '#e9f8ff', 88, 'rgba(8,14,24,0.66)', 'rgba(255,79,216,0.85)', 104);
+      label.position.copy(labelPos);
+      label.lookAt(labelPos.clone().add(labelPos.clone().normalize()));
+      label.visible = false;
+      group.add(label);
+      edgeSprites.push(label);
+      edge.sprite = label;
       edge.line = line;
     });
 
     allVertices.forEach((vertex) => {
       const labelPos = vertex.position.clone().add(vertex.position.clone().normalize().multiplyScalar(outerByFace + 0.12));
-      const sprite = makeDiscSprite('', '#e9f8ff', 86, 'rgba(8,14,24,0.66)', 'rgba(185,255,77,0.9)', 104);
-      sprite.position.copy(labelPos);
-      sprite.visible = false;
-      group.add(sprite);
-      vertexSprites.push(sprite);
-      vertex.sprite = sprite;
+      const label = makeDiscLabel('', '#e9f8ff', 86, 'rgba(8,14,24,0.66)', 'rgba(185,255,77,0.9)', 104);
+      label.position.copy(labelPos);
+      label.lookAt(labelPos.clone().add(labelPos.clone().normalize()));
+      label.visible = false;
+      group.add(label);
+      vertexSprites.push(label);
+      vertex.sprite = label;
     });
 
     faceCenters.forEach((center, i) => {
-      const sprite = makeFaceNumberSprite();
-      sprite.position.copy(center.clone().add(faceNormals[i].clone().multiplyScalar(0.10)));
-      group.add(sprite);
-      faceTextSprites.push(sprite);
+      const label = makeFaceNumberLabel();
+      const position = center.clone().add(faceNormals[i].clone().multiplyScalar(0.10));
+      label.position.copy(position);
+      label.lookAt(position.clone().add(faceNormals[i]));
+      group.add(label);
+      faceTextSprites.push(label);
     });
 
     const levelDefinitions = {
@@ -469,21 +471,21 @@
     function assignNumberToSelectedFace() {
       if (selectedFace == null) return;
       faceValues[selectedFace] = selectedNumber;
-      updateFaceSprite(faceTextSprites[selectedFace], selectedNumber, false);
+      updateFaceLabel(faceTextSprites[selectedFace], selectedNumber, false);
       refreshStatus();
     }
 
     function clearSelectedFace() {
       if (selectedFace == null) return;
       faceValues[selectedFace] = null;
-      updateFaceSprite(faceTextSprites[selectedFace], '');
+      updateFaceLabel(faceTextSprites[selectedFace], '');
       refreshStatus();
     }
 
     function resetAll() {
       for (let i = 0; i < 4; i++) {
         faceValues[i] = null;
-        updateFaceSprite(faceTextSprites[i], '');
+        updateFaceLabel(faceTextSprites[i], '');
       }
       setSelectedFace(null);
       refreshStatus();
@@ -504,11 +506,11 @@
         if (solved) {
           status = 'resuelto';
           cls = 'status-ok';
-          faceValues.forEach((value, i) => updateFaceSprite(faceTextSprites[i], value, true));
+          faceValues.forEach((value, i) => updateFaceLabel(faceTextSprites[i], value, true));
         } else {
           status = 'no cuadra con las pistas';
           cls = 'status-bad';
-          faceValues.forEach((value, i) => updateFaceSprite(faceTextSprites[i], value, false));
+          faceValues.forEach((value, i) => updateFaceLabel(faceTextSprites[i], value, false));
         }
       }
       levelMeta.innerHTML = `<strong>${currentLevel.name}</strong> · ${currentDifficulty} · pistas: ${currentLevel.clues.length}<br><span class="${cls}">${status}</span>`;
@@ -522,12 +524,12 @@
       allEdges.forEach(edge => {
         const show = currentLevel.clues.includes(edge.id);
         edge.sprite.visible = show;
-        updateDiscSprite(edge.sprite, show ? currentLevel.clueValues[edge.id] : '');
+        updateDiscLabel(edge.sprite, show ? currentLevel.clueValues[edge.id] : '');
       });
       allVertices.forEach(vertex => {
         const show = currentLevel.clues.includes(vertex.id);
         vertex.sprite.visible = show;
-        updateDiscSprite(vertex.sprite, show ? currentLevel.clueValues[vertex.id] : '');
+        updateDiscLabel(vertex.sprite, show ? currentLevel.clueValues[vertex.id] : '');
       });
 
       document.querySelectorAll('.chip').forEach(btn => btn.classList.toggle('active', btn.dataset.difficulty === currentDifficulty));
@@ -597,8 +599,6 @@
       requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
       edgeLines.forEach((line, i) => { line.material.opacity = 0.38 + 0.14 * Math.sin(t * 1.2 + i); });
-      edgeSprites.forEach((s, i) => { s.material.rotation = Math.sin(t * 0.3 + i) * 0.03; });
-      vertexSprites.forEach((s, i) => { s.material.rotation = Math.cos(t * 0.34 + i) * 0.03; });
       controls.update();
       renderer.render(scene, camera);
     }
