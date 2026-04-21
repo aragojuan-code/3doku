@@ -92,6 +92,16 @@
       box-shadow: var(--glow);
       backdrop-filter: blur(12px);
     }
+    .number-grid {
+      display:flex;
+      gap:8px;
+      overflow-x:auto;
+      scrollbar-width:none;
+      flex: 1 1 auto;
+      min-width: 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    .number-grid::-webkit-scrollbar { display:none; }
     .num-btn {
       width:48px; height:48px; border-radius:50%; border:1px solid var(--line-strong);
       background: rgba(7,12,24,.85); color: var(--txt); font-size:20px; font-weight:700;
@@ -127,6 +137,7 @@
       .picker {
         left: 8px; right: 8px; bottom: 8px; padding: 8px; gap: 6px; border-radius: 18px;
       }
+      .number-grid { gap: 6px; }
       .num-btn {
         width: 44px; height: 44px; font-size: 17px;
       }
@@ -150,7 +161,7 @@
       
 <div class="title">
   <div class="main">3Doku</div>
-  <div class="sub">gira · zoom · toca una cara · asigna 1–4</div>
+  <div class="sub" id="rangeHint">gira · zoom · toca una cara · asigna números</div>
   <div class="topbar">
     <button class="chip shape-chip active" data-shape="tetra">tetraedro</button>
     <button class="chip shape-chip" data-shape="icosa">icosaedro</button>
@@ -165,10 +176,7 @@
 </div>
 
 <div class="picker" id="picker">
-        <button class="num-btn" data-value="1">1</button>
-        <button class="num-btn" data-value="2">2</button>
-        <button class="num-btn" data-value="3">3</button>
-        <button class="num-btn" data-value="4">4</button>
+        <div class="number-grid" id="numberGrid"></div>
         <div class="actions">
           <button class="small-btn" id="clearFace">borrar</button>
         </div>
@@ -182,6 +190,8 @@
 
     const app = document.getElementById('app');
     const levelMeta = document.getElementById('levelMeta');
+    const rangeHint = document.getElementById('rangeHint');
+    const numberGrid = document.getElementById('numberGrid');
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -233,7 +243,7 @@
 
     const puzzleDefinitions = {
       tetra: {
-        geometryFactory: () => new THREE.TetrahedronGeometry(2.15, 0),
+        geometryFactory: () => new THREE.TetrahedronGeometry(1.75, 0),
         levels: {
           facil: [
             { solution: [1,2,3,4], clues: ['e0','e1','e3','v0','v2'], name: 'Tetra Fácil 1' },
@@ -253,40 +263,40 @@
         }
       },
       icosa: {
-        geometryFactory: () => new THREE.IcosahedronGeometry(2.45, 0),
+        geometryFactory: () => new THREE.IcosahedronGeometry(2.05, 0),
         levels: {
           facil: [
             {
-              solutionGenerator: (faces) => faces.map((_, i) => (i % 4) + 1),
+              solutionGenerator: (faces) => rankFacesToUniqueNumbers(faces, ['y', 'x', 'z']),
               clueRule: { edgeStep: 2, vertexStep: 1 },
               name: 'Icosa Fácil 1'
             },
             {
-              solutionGenerator: (faces) => faces.map((center) => 1 + ((center.x > 0) ? 1 : 0) + ((center.y > 0) ? 2 : 0)),
+              solutionGenerator: (faces) => rankFacesToUniqueNumbers(faces, ['x', 'z', 'y']),
               clueRule: { edgeStep: 2, vertexStep: 2 },
               name: 'Icosa Fácil 2'
             }
           ],
           medio: [
             {
-              solutionGenerator: (faces) => faces.map((center, i) => 1 + ((center.z > 0) ? 1 : 0) + (i % 2)),
+              solutionGenerator: (faces) => rankFacesToUniqueNumbers(faces, ['z', 'y', 'x']),
               clueRule: { edgeStep: 3, vertexStep: 2 },
               name: 'Icosa Medio 1'
             },
             {
-              solutionGenerator: (faces) => faces.map((center, i) => 1 + ((center.x + center.y > 0) ? 1 : 0) + ((i + 1) % 2)),
+              solutionGenerator: (faces) => rankFacesToUniqueNumbers(faces, ['x', 'y', 'z'], [true, false, true]),
               clueRule: { edgeStep: 4, vertexStep: 2 },
               name: 'Icosa Medio 2'
             }
           ],
           dificil: [
             {
-              solutionGenerator: (faces) => faces.map((center, i) => 1 + ((center.y > 0) ? 2 : 0) + ((Math.abs(center.x) > Math.abs(center.z)) ? 1 : 0)),
+              solutionGenerator: (faces) => rankFacesToUniqueNumbers(faces, ['y', 'z', 'x'], [true, true, false]),
               clueRule: { edgeStep: 5, vertexStep: 3 },
               name: 'Icosa Difícil 1'
             },
             {
-              solutionGenerator: (faces) => faces.map((center, i) => 1 + ((center.z > 0) ? 2 : 0) + ((i % 3) ? 0 : 1)),
+              solutionGenerator: (faces) => rankFacesToUniqueNumbers(faces, ['z', 'x', 'y'], [false, true, true]),
               clueRule: { edgeStep: 5, vertexStep: 4 },
               name: 'Icosa Difícil 2'
             }
@@ -294,6 +304,22 @@
         }
       }
     };
+
+    function rankFacesToUniqueNumbers(faces, axes = ['x', 'y', 'z'], invert = [false, false, false]) {
+      const sorted = faces.map((center, index) => ({ center, index }))
+        .sort((a, b) => {
+          for (let i = 0; i < axes.length; i++) {
+            const axis = axes[i];
+            const factor = invert[i] ? -1 : 1;
+            const diff = (a.center[axis] - b.center[axis]) * factor;
+            if (Math.abs(diff) > 1e-6) return diff;
+          }
+          return a.index - b.index;
+        });
+      const solution = new Array(faces.length);
+      sorted.forEach((item, order) => { solution[item.index] = order + 1; });
+      return solution;
+    }
 
     function orientLabelToNormal(object, normal) {
       const safeNormal = normal.clone().normalize();
@@ -338,7 +364,7 @@
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.66), mat);
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.82), mat);
       plane.userData = { canvas, ctx, tex };
       updateFaceSprite(plane, '');
       return plane;
@@ -348,7 +374,7 @@
       const { canvas, ctx, tex } = sprite.userData;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (text !== '' && text != null) {
-        ctx.font = '700 126px Inter, Arial, sans-serif';
+        ctx.font = '700 154px Inter, Arial, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = solved ? '#73ffb1' : '#ffffff';
         ctx.shadowBlur = 20; ctx.shadowColor = solved ? '#73ffb1' : '#61fff2';
@@ -532,7 +558,7 @@
       Object.values(defs).forEach((levels) => {
         levels.forEach((level) => {
           if (level.solutionGenerator) {
-            level.solution = level.solutionGenerator(puzzle.faceCenters).map(v => Math.max(1, Math.min(4, v)));
+            level.solution = level.solutionGenerator(puzzle.faceCenters);
           }
           if (level.clueRule) {
             level.clues = pickClues(level.clueRule);
@@ -556,7 +582,29 @@
       selectedNumber = n;
       document.querySelectorAll('.num-btn').forEach(btn => btn.classList.toggle('active', Number(btn.dataset.value) === n));
     }
-    setSelectedNumber(1);
+
+    function getMaxNumberForShape(shapeKey) {
+      return shapeKey === 'icosa' ? 20 : 4;
+    }
+
+    function renderNumberPicker(shapeKey) {
+      const max = getMaxNumberForShape(shapeKey);
+      numberGrid.innerHTML = '';
+      for (let n = 1; n <= max; n++) {
+        const btn = document.createElement('button');
+        btn.className = 'num-btn';
+        btn.dataset.value = String(n);
+        btn.textContent = String(n);
+        btn.addEventListener('click', () => {
+          setSelectedNumber(n);
+          assignNumberToSelectedFace();
+        });
+        numberGrid.appendChild(btn);
+      }
+      if (selectedNumber > max) selectedNumber = 1;
+      setSelectedNumber(selectedNumber);
+      rangeHint.textContent = `gira · zoom · toca una cara · asigna 1–${max}`;
+    }
 
     function assignNumberToSelectedFace() {
       if (selectedFace == null) return;
@@ -583,9 +631,14 @@
 
     function refreshStatus() {
       const filled = faceValues.every(v => v != null);
+      const assigned = faceValues.filter(v => v != null);
+      const hasDuplicates = new Set(assigned).size !== assigned.length;
       let status = `completa las ${puzzle.faceMeshes.length} caras`;
       let cls = '';
-      if (filled) {
+      if (hasDuplicates) {
+        status = 'hay números repetidos';
+        cls = 'status-bad';
+      } else if (filled) {
         const solved = arraysEqual(faceValues, currentLevel.solution);
         if (solved) {
           status = 'resuelto';
@@ -626,16 +679,12 @@
       activeShape = shapeKey;
       destroyPuzzle(puzzle);
       puzzle = createPuzzle(shapeKey);
+      renderNumberPicker(shapeKey);
       prepareLevels(shapeKey);
       currentLevelIndex = 0;
       setSelectedFace(null);
       applyLevel();
     }
-
-    document.querySelectorAll('.num-btn').forEach(btn => btn.addEventListener('click', () => {
-      setSelectedNumber(Number(btn.dataset.value));
-      assignNumberToSelectedFace();
-    }));
     document.getElementById('clearFace').addEventListener('click', clearSelectedFace);
     document.getElementById('reloadLevel').addEventListener('click', applyLevel);
     document.getElementById('prevLevel').addEventListener('click', () => {
@@ -680,7 +729,11 @@
     });
 
     window.addEventListener('keydown', (e) => {
-      if (/^[1-4]$/.test(e.key)) { setSelectedNumber(Number(e.key)); assignNumberToSelectedFace(); }
+      const n = Number(e.key);
+      if (Number.isInteger(n) && n >= 1 && n <= getMaxNumberForShape(activeShape)) {
+        setSelectedNumber(n);
+        assignNumberToSelectedFace();
+      }
       if (e.key === 'Backspace' || e.key === 'Delete') clearSelectedFace();
       if (e.key.toLowerCase() === 'r') applyLevel();
       if (e.key.toLowerCase() === 'n') document.getElementById('nextLevel').click();
