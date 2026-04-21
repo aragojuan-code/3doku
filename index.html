@@ -152,6 +152,8 @@
   <div class="main">3Doku</div>
   <div class="sub">gira · zoom · toca una cara · asigna 1–4</div>
   <div class="topbar">
+    <button class="chip shape-chip active" data-shape="tetra">tetraedro</button>
+    <button class="chip shape-chip" data-shape="icosa">icosaedro</button>
     <button class="chip active" data-difficulty="facil">fácil</button>
     <button class="chip" data-difficulty="medio">medio</button>
     <button class="chip" data-difficulty="dificil">difícil</button>
@@ -211,17 +213,6 @@
     const group = new THREE.Group();
     scene.add(group);
 
-    const tetraRadius = 2.15;
-    const tetraGeo = new THREE.TetrahedronGeometry(tetraRadius, 0);
-    tetraGeo.computeVertexNormals();
-    const posAttr = tetraGeo.getAttribute('position');
-
-    const uniqueVerts = [];
-    for (let i = 0; i < posAttr.count; i++) {
-      const v = new THREE.Vector3().fromBufferAttribute(posAttr, i);
-      if (!uniqueVerts.some(u => u.distanceTo(v) < 1e-5)) uniqueVerts.push(v);
-    }
-
     const neon = {
       cyan: new THREE.Color(0x61fff2),
       pink: new THREE.Color(0xff4fd8),
@@ -229,91 +220,80 @@
       violet: new THREE.Color(0x9c7bff)
     };
 
-    const faceValues = [null, null, null, null];
+    let activeShape = 'tetra';
+    let puzzle = null;
+    let faceValues = [];
     let selectedFace = null;
     let selectedNumber = 1;
     let currentDifficulty = 'facil';
     let currentLevelIndex = 0;
     let currentLevel = null;
 
-    const faceMeshes = [];
-    const faceCenters = [];
-    const faceNormals = [];
-    const faceIndexToVertices = [];
+    const edgeLineMat = new THREE.LineBasicMaterial({ color: 0x61fff2, transparent: true, opacity: 0.52 });
 
-    const triCount = posAttr.count / 3;
-    for (let t = 0; t < triCount; t++) {
-      const a = new THREE.Vector3().fromBufferAttribute(posAttr, t * 3 + 0);
-      const b = new THREE.Vector3().fromBufferAttribute(posAttr, t * 3 + 1);
-      const c = new THREE.Vector3().fromBufferAttribute(posAttr, t * 3 + 2);
-      const localGeo = new THREE.BufferGeometry().setFromPoints([a, b, c]);
-      localGeo.setIndex([0, 1, 2]);
-      localGeo.computeVertexNormals();
-
-      const mat = new THREE.MeshPhysicalMaterial({
-        color: 0x9c7bff,
-        emissive: 0x112244,
-        emissiveIntensity: 0.7,
-        transparent: true,
-        opacity: 0.24,
-        roughness: 0.18,
-        metalness: 0.08,
-        transmission: 0.18,
-        thickness: 0.3,
-        side: THREE.DoubleSide,
-        depthWrite: false
-      });
-      const mesh = new THREE.Mesh(localGeo, mat);
-      mesh.userData.faceIndex = t;
-      group.add(mesh);
-      faceMeshes.push(mesh);
-
-      const center = a.clone().add(b).add(c).multiplyScalar(1 / 3);
-      faceCenters.push(center);
-
-      const normal = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
-      if (normal.dot(center) < 0) normal.multiplyScalar(-1);
-      faceNormals.push(normal);
-
-      const ids = [a, b, c].map(v => uniqueVerts.findIndex(u => u.distanceTo(v) < 1e-5));
-      faceIndexToVertices.push(ids);
-    }
-
-    const vertexIdKey = (a, b) => [Math.min(a, b), Math.max(a, b)].join('-');
-
-    const allEdges = [];
-    for (let i = 0; i < uniqueVerts.length; i++) {
-      for (let j = i + 1; j < uniqueVerts.length; j++) {
-        const touchingFaces = [];
-        faceIndexToVertices.forEach((verts, faceIndex) => {
-          if (verts.includes(i) && verts.includes(j)) touchingFaces.push(faceIndex);
-        });
-        const a = uniqueVerts[i];
-        const b = uniqueVerts[j];
-        const mid = a.clone().add(b).multiplyScalar(0.5);
-        allEdges.push({
-          id: `e${allEdges.length}`,
-          vertexPair: [i, j],
-          key: vertexIdKey(i, j),
-          faces: touchingFaces,
-          midpoint: mid
-        });
+    const puzzleDefinitions = {
+      tetra: {
+        geometryFactory: () => new THREE.TetrahedronGeometry(2.15, 0),
+        levels: {
+          facil: [
+            { solution: [1,2,3,4], clues: ['e0','e1','e3','v0','v2'], name: 'Tetra Fácil 1' },
+            { solution: [2,1,4,3], clues: ['e0','e2','e5','v1','v3'], name: 'Tetra Fácil 2' },
+            { solution: [3,1,2,4], clues: ['e1','e2','e4','v0','v1'], name: 'Tetra Fácil 3' }
+          ],
+          medio: [
+            { solution: [1,2,3,4], clues: ['e0','e2','v1','v2'], name: 'Tetra Medio 1' },
+            { solution: [2,4,1,3], clues: ['e1','e4','v0','v3'], name: 'Tetra Medio 2' },
+            { solution: [3,1,4,2], clues: ['e0','e5','v1','v3'], name: 'Tetra Medio 3' }
+          ],
+          dificil: [
+            { solution: [1,2,3,4], clues: ['e0','e3','v0'], name: 'Tetra Difícil 1' },
+            { solution: [2,1,4,3], clues: ['e1','e5','v1'], name: 'Tetra Difícil 2' },
+            { solution: [3,1,2,4], clues: ['e2','e4','v2'], name: 'Tetra Difícil 3' }
+          ]
+        }
+      },
+      icosa: {
+        geometryFactory: () => new THREE.IcosahedronGeometry(2.45, 0),
+        levels: {
+          facil: [
+            {
+              solutionGenerator: (faces) => faces.map((_, i) => (i % 4) + 1),
+              clueRule: { edgeStep: 2, vertexStep: 1 },
+              name: 'Icosa Fácil 1'
+            },
+            {
+              solutionGenerator: (faces) => faces.map((center) => 1 + ((center.x > 0) ? 1 : 0) + ((center.y > 0) ? 2 : 0)),
+              clueRule: { edgeStep: 2, vertexStep: 2 },
+              name: 'Icosa Fácil 2'
+            }
+          ],
+          medio: [
+            {
+              solutionGenerator: (faces) => faces.map((center, i) => 1 + ((center.z > 0) ? 1 : 0) + (i % 2)),
+              clueRule: { edgeStep: 3, vertexStep: 2 },
+              name: 'Icosa Medio 1'
+            },
+            {
+              solutionGenerator: (faces) => faces.map((center, i) => 1 + ((center.x + center.y > 0) ? 1 : 0) + ((i + 1) % 2)),
+              clueRule: { edgeStep: 4, vertexStep: 2 },
+              name: 'Icosa Medio 2'
+            }
+          ],
+          dificil: [
+            {
+              solutionGenerator: (faces) => faces.map((center, i) => 1 + ((center.y > 0) ? 2 : 0) + ((Math.abs(center.x) > Math.abs(center.z)) ? 1 : 0)),
+              clueRule: { edgeStep: 5, vertexStep: 3 },
+              name: 'Icosa Difícil 1'
+            },
+            {
+              solutionGenerator: (faces) => faces.map((center, i) => 1 + ((center.z > 0) ? 2 : 0) + ((i % 3) ? 0 : 1)),
+              clueRule: { edgeStep: 5, vertexStep: 4 },
+              name: 'Icosa Difícil 2'
+            }
+          ]
+        }
       }
-    }
-
-    const allVertices = uniqueVerts.map((vert, vertexIndex) => ({
-      id: `v${vertexIndex}`,
-      vertexIndex,
-      faces: faceIndexToVertices.flatMap((verts, faceIndex) => verts.includes(vertexIndex) ? [faceIndex] : []),
-      position: vert.clone()
-    }));
-
-    const edgeLines = [];
-    const edgeSprites = [];
-    const vertexSprites = [];
-    const faceTextSprites = [];
-    const outerByFace = 0.095;
-    const outerByEdge = 0.11;
+    };
 
     function makeDiscSprite(text, color = '#e9f8ff', fontSize = 92, bg = 'rgba(6,12,24,0.62)', border = 'rgba(97,255,242,0.9)', r = 120) {
       const canvas = document.createElement('canvas');
@@ -354,7 +334,7 @@
       tex.colorSpace = THREE.SRGBColorSpace;
       const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
       const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(0.74, 0.74, 1);
+      sprite.scale.set(0.66, 0.66, 1);
       sprite.userData = { canvas, ctx, tex };
       updateFaceSprite(sprite, '');
       return sprite;
@@ -374,84 +354,189 @@
       tex.needsUpdate = true;
     }
 
-    const edgeLineMat = new THREE.LineBasicMaterial({ color: 0x61fff2, transparent: true, opacity: 0.52 });
+    function createPuzzle(shapeKey) {
+      const geo = puzzleDefinitions[shapeKey].geometryFactory();
+      geo.computeVertexNormals();
+      const posAttr = geo.getAttribute('position');
 
-    allEdges.forEach((edge) => {
-      const [i, j] = edge.vertexPair;
-      const a = uniqueVerts[i];
-      const b = uniqueVerts[j];
-      const g = new THREE.BufferGeometry().setFromPoints([a, b]);
-      const line = new THREE.Line(g, edgeLineMat);
-      group.add(line);
-      edgeLines.push(line);
+      const uniqueVerts = [];
+      for (let i = 0; i < posAttr.count; i++) {
+        const v = new THREE.Vector3().fromBufferAttribute(posAttr, i);
+        if (!uniqueVerts.some(u => u.distanceTo(v) < 1e-5)) uniqueVerts.push(v);
+      }
 
-      const labelPos = edge.midpoint.clone().add(edge.midpoint.clone().normalize().multiplyScalar(outerByEdge));
-      const sprite = makeDiscSprite('', '#e9f8ff', 88, 'rgba(8,14,24,0.66)', 'rgba(255,79,216,0.85)', 104);
-      sprite.position.copy(labelPos);
-      sprite.visible = false;
-      group.add(sprite);
-      edgeSprites.push(sprite);
-      edge.sprite = sprite;
-      edge.line = line;
-    });
+      const faceMeshes = [];
+      const faceCenters = [];
+      const faceNormals = [];
+      const faceIndexToVertices = [];
 
-    allVertices.forEach((vertex) => {
-      const labelPos = vertex.position.clone().add(vertex.position.clone().normalize().multiplyScalar(outerByFace + 0.12));
-      const sprite = makeDiscSprite('', '#e9f8ff', 86, 'rgba(8,14,24,0.66)', 'rgba(185,255,77,0.9)', 104);
-      sprite.position.copy(labelPos);
-      sprite.visible = false;
-      group.add(sprite);
-      vertexSprites.push(sprite);
-      vertex.sprite = sprite;
-    });
+      const triCount = posAttr.count / 3;
+      for (let t = 0; t < triCount; t++) {
+        const a = new THREE.Vector3().fromBufferAttribute(posAttr, t * 3 + 0);
+        const b = new THREE.Vector3().fromBufferAttribute(posAttr, t * 3 + 1);
+        const c = new THREE.Vector3().fromBufferAttribute(posAttr, t * 3 + 2);
+        const localGeo = new THREE.BufferGeometry().setFromPoints([a, b, c]);
+        localGeo.setIndex([0, 1, 2]);
+        localGeo.computeVertexNormals();
 
-    faceCenters.forEach((center, i) => {
-      const sprite = makeFaceNumberSprite();
-      sprite.position.copy(center.clone().add(faceNormals[i].clone().multiplyScalar(0.10)));
-      group.add(sprite);
-      faceTextSprites.push(sprite);
-    });
+        const mat = new THREE.MeshPhysicalMaterial({
+          color: 0x9c7bff,
+          emissive: 0x112244,
+          emissiveIntensity: 0.7,
+          transparent: true,
+          opacity: 0.24,
+          roughness: 0.18,
+          metalness: 0.08,
+          transmission: 0.18,
+          thickness: 0.3,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
 
-    const levelDefinitions = {
-      facil: [
-        { solution: [1,2,3,4], clues: ['e0','e1','e3','v0','v2'], name: 'Fácil 1' },
-        { solution: [2,1,4,3], clues: ['e0','e2','e5','v1','v3'], name: 'Fácil 2' },
-        { solution: [3,1,2,4], clues: ['e1','e2','e4','v0','v1'], name: 'Fácil 3' },
-        { solution: [4,2,1,3], clues: ['e0','e4','e5','v2','v3'], name: 'Fácil 4' },
-        { solution: [2,4,1,3], clues: ['e1','e3','e5','v0','v2'], name: 'Fácil 5' }
-      ],
-      medio: [
-        { solution: [1,2,3,4], clues: ['e0','e2','v1','v2'], name: 'Medio 1' },
-        { solution: [2,4,1,3], clues: ['e1','e4','v0','v3'], name: 'Medio 2' },
-        { solution: [3,1,4,2], clues: ['e0','e5','v1','v3'], name: 'Medio 3' },
-        { solution: [4,3,1,2], clues: ['e2','e3','v0','v2'], name: 'Medio 4' },
-        { solution: [2,3,4,1], clues: ['e1','e5','v0','v1'], name: 'Medio 5' }
-      ],
-      dificil: [
-        { solution: [1,2,3,4], clues: ['e0','e3','v0'], name: 'Difícil 1' },
-        { solution: [2,1,4,3], clues: ['e1','e5','v1'], name: 'Difícil 2' },
-        { solution: [3,1,2,4], clues: ['e2','e4','v2'], name: 'Difícil 3' },
-        { solution: [4,2,1,3], clues: ['e0','e5','v1'], name: 'Difícil 4' },
-        { solution: [2,4,1,3], clues: ['e3','e4','v0'], name: 'Difícil 5' },
-        { solution: [3,2,4,1], clues: ['e1','e2','v3'], name: 'Difícil 6' }
-      ]
-    };
+        const mesh = new THREE.Mesh(localGeo, mat);
+        mesh.userData.faceIndex = t;
+        group.add(mesh);
+        faceMeshes.push(mesh);
+
+        const center = a.clone().add(b).add(c).multiplyScalar(1 / 3);
+        faceCenters.push(center);
+
+        const normal = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
+        if (normal.dot(center) < 0) normal.multiplyScalar(-1);
+        faceNormals.push(normal);
+
+        const ids = [a, b, c].map(v => uniqueVerts.findIndex(u => u.distanceTo(v) < 1e-5));
+        faceIndexToVertices.push(ids);
+      }
+
+      const vertexIdKey = (a, b) => [Math.min(a, b), Math.max(a, b)].join('-');
+      const allEdges = [];
+      for (let i = 0; i < uniqueVerts.length; i++) {
+        for (let j = i + 1; j < uniqueVerts.length; j++) {
+          const touchingFaces = [];
+          faceIndexToVertices.forEach((verts, faceIndex) => {
+            if (verts.includes(i) && verts.includes(j)) touchingFaces.push(faceIndex);
+          });
+          if (touchingFaces.length !== 2) continue;
+          const a = uniqueVerts[i];
+          const b = uniqueVerts[j];
+          const mid = a.clone().add(b).multiplyScalar(0.5);
+          const edge = {
+            id: `e${allEdges.length}`,
+            vertexPair: [i, j],
+            key: vertexIdKey(i, j),
+            faces: touchingFaces,
+            midpoint: mid
+          };
+          allEdges.push(edge);
+        }
+      }
+
+      const allVertices = uniqueVerts.map((vert, vertexIndex) => ({
+        id: `v${vertexIndex}`,
+        vertexIndex,
+        faces: faceIndexToVertices.flatMap((verts, faceIndex) => verts.includes(vertexIndex) ? [faceIndex] : []),
+        position: vert.clone()
+      }));
+
+      const edgeLines = [];
+      const edgeSprites = [];
+      const vertexSprites = [];
+      const faceTextSprites = [];
+
+      const outerByFace = shapeKey === 'icosa' ? 0.11 : 0.095;
+      const outerByEdge = shapeKey === 'icosa' ? 0.13 : 0.11;
+
+      allEdges.forEach((edge) => {
+        const [i, j] = edge.vertexPair;
+        const a = uniqueVerts[i];
+        const b = uniqueVerts[j];
+        const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+        const line = new THREE.Line(g, edgeLineMat);
+        group.add(line);
+        edgeLines.push(line);
+
+        const labelPos = edge.midpoint.clone().add(edge.midpoint.clone().normalize().multiplyScalar(outerByEdge));
+        const sprite = makeDiscSprite('', '#e9f8ff', shapeKey === 'icosa' ? 68 : 88, 'rgba(8,14,24,0.66)', 'rgba(255,79,216,0.85)', shapeKey === 'icosa' ? 92 : 104);
+        sprite.position.copy(labelPos);
+        sprite.visible = false;
+        group.add(sprite);
+        edgeSprites.push(sprite);
+        edge.sprite = sprite;
+        edge.line = line;
+      });
+
+      allVertices.forEach((vertex) => {
+        const labelPos = vertex.position.clone().add(vertex.position.clone().normalize().multiplyScalar(outerByFace + (shapeKey === 'icosa' ? 0.08 : 0.12)));
+        const sprite = makeDiscSprite('', '#e9f8ff', shapeKey === 'icosa' ? 68 : 86, 'rgba(8,14,24,0.66)', 'rgba(185,255,77,0.9)', shapeKey === 'icosa' ? 92 : 104);
+        sprite.position.copy(labelPos);
+        sprite.visible = false;
+        group.add(sprite);
+        vertexSprites.push(sprite);
+        vertex.sprite = sprite;
+      });
+
+      faceCenters.forEach((center, i) => {
+        const sprite = makeFaceNumberSprite();
+        sprite.position.copy(center.clone().add(faceNormals[i].clone().multiplyScalar(shapeKey === 'icosa' ? 0.09 : 0.10)));
+        group.add(sprite);
+        faceTextSprites.push(sprite);
+      });
+
+      return { shapeKey, faceMeshes, faceCenters, faceNormals, allEdges, allVertices, edgeLines, edgeSprites, vertexSprites, faceTextSprites };
+    }
+
+    function destroyPuzzle(oldPuzzle) {
+      if (!oldPuzzle) return;
+      [
+        ...oldPuzzle.faceMeshes,
+        ...oldPuzzle.edgeLines,
+        ...oldPuzzle.edgeSprites,
+        ...oldPuzzle.vertexSprites,
+        ...oldPuzzle.faceTextSprites
+      ].forEach((obj) => {
+        group.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material?.map) obj.material.map.dispose();
+        if (obj.material) obj.material.dispose();
+      });
+    }
 
     function computeClueValues(solution) {
       const clues = {};
-      allEdges.forEach((edge) => {
+      puzzle.allEdges.forEach((edge) => {
         const [f0, f1] = edge.faces;
         clues[edge.id] = solution[f0] + solution[f1];
       });
-      allVertices.forEach((vertex) => {
+      puzzle.allVertices.forEach((vertex) => {
         clues[vertex.id] = vertex.faces.reduce((sum, faceIndex) => sum + solution[faceIndex], 0);
       });
       return clues;
     }
 
+    function pickClues(rule) {
+      const edgeIds = puzzle.allEdges.filter((_, i) => i % rule.edgeStep === 0).map(e => e.id);
+      const vertexIds = puzzle.allVertices.filter((_, i) => i % rule.vertexStep === 0).map(v => v.id);
+      return [...edgeIds, ...vertexIds];
+    }
+
+    function prepareLevels(shapeKey) {
+      const defs = puzzleDefinitions[shapeKey].levels;
+      Object.values(defs).forEach((levels) => {
+        levels.forEach((level) => {
+          if (level.solutionGenerator) {
+            level.solution = level.solutionGenerator(puzzle.faceCenters).map(v => Math.max(1, Math.min(4, v)));
+          }
+          if (level.clueRule) {
+            level.clues = pickClues(level.clueRule);
+          }
+        });
+      });
+    }
+
     function setSelectedFace(idx) {
       selectedFace = idx;
-      faceMeshes.forEach((mesh, i) => {
+      puzzle.faceMeshes.forEach((mesh, i) => {
         const selected = i === idx;
         mesh.material.color.set(selected ? 0x61fff2 : 0x9c7bff);
         mesh.material.emissive.set(selected ? 0x144b66 : 0x112244);
@@ -469,22 +554,20 @@
     function assignNumberToSelectedFace() {
       if (selectedFace == null) return;
       faceValues[selectedFace] = selectedNumber;
-      updateFaceSprite(faceTextSprites[selectedFace], selectedNumber, false);
+      updateFaceSprite(puzzle.faceTextSprites[selectedFace], selectedNumber, false);
       refreshStatus();
     }
 
     function clearSelectedFace() {
       if (selectedFace == null) return;
       faceValues[selectedFace] = null;
-      updateFaceSprite(faceTextSprites[selectedFace], '');
+      updateFaceSprite(puzzle.faceTextSprites[selectedFace], '');
       refreshStatus();
     }
 
     function resetAll() {
-      for (let i = 0; i < 4; i++) {
-        faceValues[i] = null;
-        updateFaceSprite(faceTextSprites[i], '');
-      }
+      faceValues = puzzle.faceMeshes.map(() => null);
+      puzzle.faceTextSprites.forEach((sprite) => updateFaceSprite(sprite, ''));
       setSelectedFace(null);
       refreshStatus();
     }
@@ -493,45 +576,53 @@
 
     function refreshStatus() {
       const filled = faceValues.every(v => v != null);
-      const noRepeats = new Set(faceValues.filter(v => v != null)).size === faceValues.filter(v => v != null).length;
-      let status = 'completa las 4 caras';
+      let status = `completa las ${puzzle.faceMeshes.length} caras`;
       let cls = '';
-      if (!noRepeats) {
-        status = 'no se puede repetir un número';
-        cls = 'status-bad';
-      } else if (filled) {
+      if (filled) {
         const solved = arraysEqual(faceValues, currentLevel.solution);
         if (solved) {
           status = 'resuelto';
           cls = 'status-ok';
-          faceValues.forEach((value, i) => updateFaceSprite(faceTextSprites[i], value, true));
+          faceValues.forEach((value, i) => updateFaceSprite(puzzle.faceTextSprites[i], value, true));
         } else {
           status = 'no cuadra con las pistas';
           cls = 'status-bad';
-          faceValues.forEach((value, i) => updateFaceSprite(faceTextSprites[i], value, false));
+          faceValues.forEach((value, i) => updateFaceSprite(puzzle.faceTextSprites[i], value, false));
         }
       }
-      levelMeta.innerHTML = `<strong>${currentLevel.name}</strong> · ${currentDifficulty} · pistas: ${currentLevel.clues.length}<br><span class="${cls}">${status}</span>`;
+      levelMeta.innerHTML = `<strong>${currentLevel.name}</strong> · ${currentDifficulty} · ${activeShape} · pistas: ${currentLevel.clues.length}<br><span class="${cls}">${status}</span>`;
     }
 
     function applyLevel() {
-      currentLevel = levelDefinitions[currentDifficulty][currentLevelIndex];
+      const levels = puzzleDefinitions[activeShape].levels[currentDifficulty];
+      currentLevel = levels[currentLevelIndex];
       currentLevel.clueValues = computeClueValues(currentLevel.solution);
       resetAll();
 
-      allEdges.forEach(edge => {
+      puzzle.allEdges.forEach(edge => {
         const show = currentLevel.clues.includes(edge.id);
         edge.sprite.visible = show;
         updateDiscSprite(edge.sprite, show ? currentLevel.clueValues[edge.id] : '');
       });
-      allVertices.forEach(vertex => {
+      puzzle.allVertices.forEach(vertex => {
         const show = currentLevel.clues.includes(vertex.id);
         vertex.sprite.visible = show;
         updateDiscSprite(vertex.sprite, show ? currentLevel.clueValues[vertex.id] : '');
       });
 
-      document.querySelectorAll('.chip').forEach(btn => btn.classList.toggle('active', btn.dataset.difficulty === currentDifficulty));
+      document.querySelectorAll('.chip[data-difficulty]').forEach(btn => btn.classList.toggle('active', btn.dataset.difficulty === currentDifficulty));
+      document.querySelectorAll('.shape-chip').forEach(btn => btn.classList.toggle('active', btn.dataset.shape === activeShape));
       refreshStatus();
+    }
+
+    function loadShape(shapeKey) {
+      activeShape = shapeKey;
+      destroyPuzzle(puzzle);
+      puzzle = createPuzzle(shapeKey);
+      prepareLevels(shapeKey);
+      currentLevelIndex = 0;
+      setSelectedFace(null);
+      applyLevel();
     }
 
     document.querySelectorAll('.num-btn').forEach(btn => btn.addEventListener('click', () => {
@@ -541,19 +632,22 @@
     document.getElementById('clearFace').addEventListener('click', clearSelectedFace);
     document.getElementById('reloadLevel').addEventListener('click', applyLevel);
     document.getElementById('prevLevel').addEventListener('click', () => {
-      const levels = levelDefinitions[currentDifficulty];
+      const levels = puzzleDefinitions[activeShape].levels[currentDifficulty];
       currentLevelIndex = (currentLevelIndex - 1 + levels.length) % levels.length;
       applyLevel();
     });
     document.getElementById('nextLevel').addEventListener('click', () => {
-      const levels = levelDefinitions[currentDifficulty];
+      const levels = puzzleDefinitions[activeShape].levels[currentDifficulty];
       currentLevelIndex = (currentLevelIndex + 1) % levels.length;
       applyLevel();
     });
-    document.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.chip[data-difficulty]').forEach(btn => btn.addEventListener('click', () => {
       currentDifficulty = btn.dataset.difficulty;
       currentLevelIndex = 0;
       applyLevel();
+    }));
+    document.querySelectorAll('.shape-chip').forEach(btn => btn.addEventListener('click', () => {
+      loadShape(btn.dataset.shape);
     }));
 
     const raycaster = new THREE.Raycaster();
@@ -574,7 +668,7 @@
       if (moved) return;
       updatePointer(e);
       raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects(faceMeshes, false);
+      const hits = raycaster.intersectObjects(puzzle.faceMeshes, false);
       if (hits.length) setSelectedFace(hits[0].object.userData.faceIndex);
     });
 
@@ -596,14 +690,14 @@
     function animate() {
       requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
-      edgeLines.forEach((line, i) => { line.material.opacity = 0.38 + 0.14 * Math.sin(t * 1.2 + i); });
-      edgeSprites.forEach((s, i) => { s.material.rotation = Math.sin(t * 0.3 + i) * 0.03; });
-      vertexSprites.forEach((s, i) => { s.material.rotation = Math.cos(t * 0.34 + i) * 0.03; });
+      puzzle?.edgeLines.forEach((line, i) => { line.material.opacity = 0.38 + 0.14 * Math.sin(t * 1.2 + i); });
+      puzzle?.edgeSprites.forEach((s, i) => { s.material.rotation = Math.sin(t * 0.3 + i) * 0.03; });
+      puzzle?.vertexSprites.forEach((s, i) => { s.material.rotation = Math.cos(t * 0.34 + i) * 0.03; });
       controls.update();
       renderer.render(scene, camera);
     }
 
-    applyLevel();
+    loadShape(activeShape);
     animate();
   </script>
 </body>
